@@ -13,21 +13,25 @@ public class PickUpScript : MonoBehaviour
     private Rigidbody heldObjRb;
     private bool canDrop = true;
     private int LayerNumber;
-    
-    public Camera mainCamera;  // Reference to the main camera
-    public Camera holdLayerCamera;  // Reference to the hold layer camera
+
+    public Camera mainCamera;         // Reference to the main camera
+    public Camera holdLayerCamera;   // Reference to the hold layer camera
     private bool isCameraSwitched = false;  // Flag to track camera state
 
     void Start()
     {
         LayerNumber = LayerMask.NameToLayer("holdLayer");
-        Cursor.lockState = CursorLockMode.Locked; // Lock cursor when not using camera switch
-        Cursor.visible = false; // Hide cursor when locked
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
+        mainCamera.enabled = true;
+        holdLayerCamera.enabled = false;
+
+        SyncCameras();
     }
 
     void Update()
     {
-        // Switch camera if object is picked up
         if (Input.GetKeyDown(KeyCode.E))
         {
             if (heldObj == null)
@@ -45,6 +49,18 @@ public class PickUpScript : MonoBehaviour
             MoveObject();
             RotateObject();
         }
+
+        if (isCameraSwitched)
+        {
+            // Sync cameras during object hold
+            SyncCameras();
+
+            // If the held object has been destroyed externally
+            if (heldObj == null)
+            {
+                SwitchCamera(false);
+            }
+        }
     }
 
     void PickUpObject()
@@ -52,40 +68,41 @@ public class PickUpScript : MonoBehaviour
         RaycastHit hit;
         if (Physics.Raycast(transform.position, transform.TransformDirection(Vector3.forward), out hit, pickUpRange))
         {
-            if (hit.transform.gameObject.tag == "canPickUp")
+            if (hit.transform.CompareTag("canPickUp"))
             {
                 heldObj = hit.transform.gameObject;
-                heldObjRb = hit.transform.GetComponent<Rigidbody>();
+                heldObjRb = heldObj.GetComponent<Rigidbody>();
                 heldObjRb.isKinematic = true;
                 heldObj.transform.parent = holdPos;
 
-                // Switch camera to the holdLayerCamera when the object is picked up
-                if (!isCameraSwitched)
-                {
-                    SwitchCamera(true);
-                }
+                SwitchCamera(true);
             }
         }
     }
 
     void DropObject()
     {
-        heldObjRb.isKinematic = false;
-        heldObj.transform.parent = null;
-        heldObj = null;
+        if (heldObj != null)
+        {
+            heldObjRb.isKinematic = false;
+            heldObj.transform.parent = null;
+            heldObj = null;
+        }
 
-        // Switch camera back to the main camera when the object is dropped
         SwitchCamera(false);
     }
 
     void MoveObject()
     {
-        heldObj.transform.position = holdPos.position;
+        if (heldObj != null)
+        {
+            heldObj.transform.position = holdPos.position;
+        }
     }
 
     void RotateObject()
     {
-        if (Input.GetKey(KeyCode.R))
+        if (heldObj != null && Input.GetKey(KeyCode.R))
         {
             float xRotation = Input.GetAxis("Mouse X") * rotationSensitivity;
             float yRotation = Input.GetAxis("Mouse Y") * rotationSensitivity;
@@ -98,6 +115,7 @@ public class PickUpScript : MonoBehaviour
     {
         if (holdLayerActive)
         {
+            SyncCameras();
             mainCamera.enabled = false;
             holdLayerCamera.enabled = true;
             isCameraSwitched = true;
@@ -107,6 +125,15 @@ public class PickUpScript : MonoBehaviour
             mainCamera.enabled = true;
             holdLayerCamera.enabled = false;
             isCameraSwitched = false;
+        }
+    }
+
+    void SyncCameras()
+    {
+        if (mainCamera != null && holdLayerCamera != null)
+        {
+            holdLayerCamera.transform.position = mainCamera.transform.position;
+            holdLayerCamera.transform.rotation = mainCamera.transform.rotation;
         }
     }
 }
